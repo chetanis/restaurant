@@ -1,0 +1,108 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String        @id @default(uuid())
+  name         String
+  last_name    String
+  phone_number String
+  username     String        @unique
+  password     String
+  role         Role
+  orders       Order[] // Relation to orders taken by this user
+  orderUpdates OrderUpdate[] // Relation to order updates made by this user
+}
+
+enum Role {
+  KITCHEN
+  WAITER
+  CASHIER
+}
+
+model Category {
+  id       Int       @id @default(autoincrement())
+  name     String
+  products Product[]
+}
+
+model Product {
+  id          Int         @id @default(autoincrement())
+  name        String
+  description String?
+  price       Float
+  categoryId  Int
+  category    Category    @relation(fields: [categoryId], references: [id])
+  items       OrderItem[] // Relation to all order items for this product
+}
+
+model Table {
+  id             Int         @id @default(autoincrement())
+  number         Int
+  numberOfChairs Int
+  status         TableStatus
+  orders         Order[] // Relation to all orders for this table
+  currentOrderId Int?        @unique // Can be null when no order is active
+  currentOrder   Order?      @relation("CurrentTableOrder", fields: [currentOrderId], references: [id])
+}
+
+enum TableStatus {
+  FREE
+  OCCUPIED
+}
+
+model Order {
+  id                Int           @id @default(autoincrement())
+  dailyOrderNumber  Int
+  tableId           Int
+  table             Table         @relation(fields: [tableId], references: [id])
+  waiterId          String // Foreign key to User model
+  waiter            User          @relation(fields: [waiterId], references: [id])
+  status            OrderStatus
+  items             OrderItem[]
+  updates           OrderUpdate[]
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  printedForKitchen Boolean       @default(false)
+  currentTable      Table?        @relation("CurrentTableOrder")
+  totalAmount       Float         @default(0) // Total amount for the entire order
+}
+
+enum OrderStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+model OrderUpdate {
+  id                Int         @id @default(autoincrement())
+  orderId           Int
+  order             Order       @relation(fields: [orderId], references: [id])
+  waiterId          String // Foreign key to User model
+  waiter            User        @relation(fields: [waiterId], references: [id])
+  items             OrderItem[]
+  createdAt         DateTime    @default(now())
+  status            OrderStatus
+  printedForKitchen Boolean     @default(false)
+  updateAmount      Float       @default(0) // Amount for this specific update
+}
+
+model OrderItem {
+  id            Int          @id @default(autoincrement())
+  productId     Int
+  product       Product      @relation(fields: [productId], references: [id])
+  orderId       Int?
+  order         Order?       @relation(fields: [orderId], references: [id])
+  orderUpdateId Int?
+  orderUpdate   OrderUpdate? @relation(fields: [orderUpdateId], references: [id])
+  quantity      Int
+  notes         String?
+  price         Float // Price at the time of ordering
+}
+
