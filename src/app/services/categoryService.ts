@@ -1,7 +1,5 @@
 import prisma from "@/app/lib/prisma";
 
-
-
 export async function getCategories() {
     return await prisma.category.findMany({
         include: { products: true }
@@ -29,25 +27,9 @@ export async function deleteCategory(id: number) {
     })
 }
 
-export async function createProduct(name: string, price: number, categoryId: number, description?: string) {
-    return await prisma.product.create({
-        data: {
-            name,
-            price,
-            categoryId,
-            description
-        }
-    })
-}
-
-export async function updateProduct(id: number, name: string, price: number, categoryId: number, description?: string) {
-    return await prisma.product.update({
+export async function getCategory(id: number) {
+    return await prisma.category.findUnique({
         where: { id },
-        data: {
-            name,
-            price,
-            categoryId,
-            description
-        }
+        include: { products: true }
     })
 }
