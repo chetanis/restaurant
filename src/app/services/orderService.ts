@@ -1,41 +1,14 @@
-import { printBill, printTicket } from '@/app/lib/printing'
-import prisma from '@/app/lib/prisma'
-import { CreateOrderInput, UpdateOrderInput } from '@/app/types/orders'
+import { printBill, printTicket } from '@/app/lib/printing';
+import prisma from '@/app/lib/prisma';
+import { OrderInput } from '@/app/types/orders';
 
-export async function createOrUpdateOrder(input: CreateOrderInput | UpdateOrderInput) {
-    if ('orderId' in input) {
-        // Update existing order
-        const orderUpdate = await prisma.orderUpdate.create({
-            data: {
-                orderId: input.orderId,
-                waiterId: input.waiterId,
-                status: 'PENDING',
-                items: {
-                    create: input.items.map(item => ({
-                        productId: item.productId,
-                        quantity: item.quantity,
-                        notes: item.notes,
-                        price: item.price,
-                        status: 'PENDING'
-                    }))
-                },
-                updateAmount: input.items.reduce((total, item) => total + item.price * item.quantity, 0)
-            },
-            include: { items: true }
-        })
 
-        // Update total amount of the main order
-        const updatedOrder = await prisma.order.update({
-            where: { id: input.orderId },
-            data: {
-                totalAmount: { increment: orderUpdate.updateAmount }
-            },
-            include: { items: true }
-        })
+export async function createOrder(input: OrderInput) {
+    if (!input.tableId || !input.waiterId || !input.items || input.items.length === 0) {
+        throw new Error("Invalid input for creating an order");
+    }
 
-        return updatedOrder
-    } else {
-        // Create new order
+    try {
         const newOrder = await prisma.order.create({
             data: {
                 tableId: input.tableId,
@@ -46,17 +19,19 @@ export async function createOrUpdateOrder(input: CreateOrderInput | UpdateOrderI
                         productId: item.productId,
                         quantity: item.quantity,
                         notes: item.notes,
-                        price: item.price,
-                        status: 'PENDING'
+                        price: item.price
                     }))
                 },
                 totalAmount: input.items.reduce((total, item) => total + item.price * item.quantity, 0),
                 dailyOrderNumber: await getNextDailyOrderNumber()
             },
             include: { items: true }
-        })
+        });
 
-        return newOrder
+        return newOrder;
+    } catch (error) {
+        console.error("Error creating order:", error);
+        throw new Error("Failed to create order");
     }
 }
 
@@ -196,47 +171,6 @@ async function getNextDailyOrderNumber() {
 
 
 // test:
-// export async function createOrder(input: CreateOrderInput): Promise<Order> {
-//     if (!input.tableId || !input.waiterId || !input.items || input.items.length === 0) {
-//         throw new Error("Invalid input for creating an order");
-//     }
-
-//     try {
-//         const newOrder = await prisma.order.create({
-//             data: {
-//                 tableId: input.tableId,
-//                 waiterId: input.waiterId,
-//                 status: 'PENDING',
-//                 items: {
-//                     create: input.items.map(item => ({
-//                         productId: item.productId,
-//                         quantity: item.quantity,
-//                         notes: item.notes,
-//                         price: item.price,
-//                         status: 'PENDING'
-//                     }))
-//                 },
-//                 totalAmount: input.items.reduce((total, item) => total + item.price * item.quantity, 0),
-//                 dailyOrderNumber: await getNextDailyOrderNumber()
-//             },
-//             include: { items: true }
-//         });
-
-//         // Update table status
-//         await prisma.table.update({
-//             where: { id: input.tableId },
-//             data: { 
-//                 status: 'OCCUPIED',
-//                 currentOrderId: newOrder.id
-//             }
-//         });
-
-//         return newOrder;
-//     } catch (error) {
-//         console.error("Error creating order:", error);
-//         throw new Error("Failed to create order");
-//     }
-// }
 // export async function updateOrder(input: UpdateOrderInput): Promise<Order> {
 //     if (!input.orderId || !input.waiterId || !input.items || input.items.length === 0) {
 //         throw new Error("Invalid input for updating an order");

@@ -62,25 +62,53 @@ export async function deleteTable(id: number): Promise<Table> {
     }
 }
 
-export async function setTableStatus(id: number, status: TableStatus): Promise<Table> {
+export async function isTableFree(id: number): Promise<boolean> {
+    if (id <= 0) {
+        throw new Error("Invalid table ID")
+    }
+    try {
+        const table = await prisma.table.findUnique({
+            where: { id }
+        })
+        return table?.status === TableStatus.FREE
+    } catch (error) {
+        console.error("Error checking if table is free:", error)
+        throw error
+    }
+}
+
+export async function setTableFree(id: number): Promise<Table> {
     if (id <= 0) {
         throw new Error("Invalid table ID")
     }
     try {
         return await prisma.table.update({
             where: { id },
-            data: { status }
+            data: {
+                status: TableStatus.FREE,
+                currentOrderId: null
+            }
         })
     } catch (error) {
-        console.error(`Error setting table status to ${status}:`, error)
+        console.error(`Error setting table status to FREE:`, error)
         throw error
     }
 }
 
-export async function setTableFree(id: number): Promise<Table> {
-    return setTableStatus(id, TableStatus.FREE)
-}
-
-export async function setTableOccupied(id: number): Promise<Table> {
-    return setTableStatus(id, TableStatus.OCCUPIED)
+export async function setTableOccupied(id: number,orderNumber:number): Promise<Table> {
+    if (id <= 0) {
+        throw new Error("Invalid table ID")
+    }
+    try {
+        return await prisma.table.update({
+            where: { id },
+            data: {
+                status: TableStatus.OCCUPIED,
+                currentOrderId: orderNumber
+            }
+        })
+    }catch (error) {
+        console.error(`Error setting table status to OCCUPIED:`, error)
+        throw error
+    }
 }
