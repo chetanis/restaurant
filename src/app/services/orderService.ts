@@ -2,6 +2,19 @@ import { printBill, printTicket } from '@/app/lib/printing';
 import prisma from '@/app/lib/prisma';
 import { OrderInput } from '@/app/types/orders';
 
+async function generatePriceMap(mealIds: number[]): Promise<{ [key: number]: number }> {
+    const meals = await prisma.meal.findMany({
+        where: { id: { in: mealIds } },
+        select: { id: true, price: true }  // Fetch the current price
+    });
+
+    // Create a price map for quick lookup
+    const priceMap = meals.reduce((acc, meal) => {
+        acc[meal.id] = meal.price;
+        return acc;
+    }, {} as { [key: number]: number });
+    return priceMap;
+}
 
 export async function createOrder(input: OrderInput) {
     if (!input.tableId || !input.waiterId || !input.items || input.items.length === 0) {
@@ -9,6 +22,18 @@ export async function createOrder(input: OrderInput) {
     }
 
     try {
+        // Fetch the prices from the database for each meal in the order
+        const mealIds = input.items.map(item => item.mealId);
+
+        const priceMap = await generatePriceMap(mealIds);
+
+        // Calculate the total amount
+        const totalAmount = input.items.reduce((total, item) => {
+            const price = priceMap[item.mealId];
+            return total + price * item.quantity;
+        }, 0);
+
+        // Create the new order
         const newOrder = await prisma.order.create({
             data: {
                 tableId: input.tableId,
@@ -16,14 +41,14 @@ export async function createOrder(input: OrderInput) {
                 status: 'PENDING',
                 items: {
                     create: input.items.map(item => ({
-                        productId: item.productId,
+                        mealId: item.mealId,
                         quantity: item.quantity,
                         notes: item.notes,
-                        price: item.price
+                        price: priceMap[item.mealId],  // Use the price from the backend
                     }))
                 },
-                totalAmount: input.items.reduce((total, item) => total + item.price * item.quantity, 0),
-                dailyOrderNumber: await getNextDailyOrderNumber()
+                totalAmount: totalAmount,
+                dailyOrderNumber: await getNextDailyOrderNumber()  // Custom logic for order numbering
             },
             include: { items: true }
         });
@@ -35,12 +60,66 @@ export async function createOrder(input: OrderInput) {
     }
 }
 
+
+export async function updateOrder(input: OrderInput, orderId: number) {
+    if (!input.waiterId || !input.items || input.items.length === 0) {
+        throw new Error("Invalid input for updating an order");
+    }
+
+    try {
+        // Fetch the prices from the database for each meal in the order update
+        const mealIds = input.items.map(item => item.mealId);
+
+        const priceMap = await generatePriceMap(mealIds);
+
+        // Calculate the update amount using the prices from the backend
+        const updateAmount = input.items.reduce((total, item) => {
+            const price = priceMap[item.mealId];
+            return total + price * item.quantity;
+        }, 0);
+
+        // Create the order update
+        const orderUpdate = await prisma.orderUpdate.create({
+            data: {
+                orderId: orderId,
+                waiterId: input.waiterId,
+                status: 'PENDING',
+                items: {
+                    create: input.items.map(item => ({
+                        mealId: item.mealId,
+                        quantity: item.quantity,
+                        notes: item.notes,
+                        price: priceMap[item.mealId],  // Use the price from the backend
+                    }))
+                },
+                updateAmount: updateAmount  // Use calculated updateAmount
+            },
+            include: { items: true }
+        });
+
+        // Update total amount of the main order
+        await prisma.order.update({
+            where: { id: orderId },
+            data: {
+                totalAmount: { increment: updateAmount }  // Increment totalAmount by updateAmount
+            },
+            include: { items: true }
+        });
+
+        return orderUpdate;
+    } catch (error) {
+        console.error("Error updating order:", error);
+        throw new Error("Failed to update order");
+    }
+}
+
+
 export async function printKitchenTicket(orderId: number, updateId?: number) {
     const items = await prisma.orderItem.findMany({
         where: updateId
             ? { orderUpdateId: updateId }
             : { orderId: orderId },
-        include: { product: true }
+        include: { meal: true }
     })
 
     const order = await prisma.order.findUnique({
@@ -59,7 +138,7 @@ export async function printKitchenTicket(orderId: number, updateId?: number) {
         Time: ${new Date().toLocaleTimeString()}
         
         Items:
-        ${items.map(item => `- ${item.quantity}x ${item.product.name} ${item.notes ? `(${item.notes})` : ''}`).join('\n')}
+        ${items.map(item => `- ${item.quantity}x ${item.meal.name} ${item.notes ? `(${item.notes})` : ''}`).join('\n\t')}
       `
 
     // Print ticket (implementation depends on your printing setup)
@@ -78,12 +157,12 @@ export async function printCustomerBill(orderId: number): Promise<void> {
         where: { id: orderId },
         include: {
             items: {
-                include: { product: true }
+                include: { meal: true }
             },
             updates: {
                 include: {
                     items: {
-                        include: { product: true }
+                        include: { meal: true }
                     }
                 }
             },
@@ -102,9 +181,9 @@ export async function printCustomerBill(orderId: number): Promise<void> {
         ...order.updates.flatMap(update => update.items)
     ]
 
-    // Group items by product for a cleaner bill
+    // Group items by meal for a cleaner bill
     const groupedItems = allItems.reduce((acc, item) => {
-        const key = `${item.productId}-${item.price}`
+        const key = `${item.mealId}-${item.price}`
         if (!acc[key]) {
             acc[key] = { ...item, quantity: 0 }
         }
@@ -130,7 +209,7 @@ export async function printCustomerBill(orderId: number): Promise<void> {
     
     Items:
     ${Object.values(groupedItems)
-            .map(item => `${item.quantity.toString().padStart(2)}x ${item.product.name.padEnd(20)} $${(item.price * item.quantity).toFixed(2)}`)
+            .map(item => `${item.quantity.toString().padStart(2)}x ${item.meal.name.padEnd(20)} $${(item.price * item.quantity).toFixed(2)}`)
             .join('\n')}
     
     ===============================
@@ -168,46 +247,3 @@ async function getNextDailyOrderNumber() {
 
     return lastOrder ? lastOrder.dailyOrderNumber + 1 : 1
 }
-
-
-// test:
-// export async function updateOrder(input: UpdateOrderInput): Promise<Order> {
-//     if (!input.orderId || !input.waiterId || !input.items || input.items.length === 0) {
-//         throw new Error("Invalid input for updating an order");
-//     }
-
-//     try {
-//         const orderUpdate = await prisma.orderUpdate.create({
-//             data: {
-//                 orderId: input.orderId,
-//                 waiterId: input.waiterId,
-//                 status: 'PENDING',
-//                 items: {
-//                     create: input.items.map(item => ({
-//                         productId: item.productId,
-//                         quantity: item.quantity,
-//                         notes: item.notes,
-//                         price: item.price,
-//                         status: 'PENDING'
-//                     }))
-//                 },
-//                 updateAmount: input.items.reduce((total, item) => total + item.price * item.quantity, 0)
-//             },
-//             include: { items: true }
-//         });
-
-//         // Update total amount of the main order
-//         const updatedOrder = await prisma.order.update({
-//             where: { id: input.orderId },
-//             data: {
-//                 totalAmount: { increment: orderUpdate.updateAmount }
-//             },
-//             include: { items: true }
-//         });
-
-//         return updatedOrder;
-//     } catch (error) {
-//         console.error("Error updating order:", error);
-//         throw new Error("Failed to update order");
-//     }
-// }

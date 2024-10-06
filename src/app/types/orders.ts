@@ -5,10 +5,9 @@ export interface OrderInput {
 }
 
 export interface OrderItem {
-    productId: number;
+    mealId: number;
     quantity: number;
     notes?: string;
-    price: number;
 }
 
 export function isOrderInput(input: unknown): input is OrderInput {
@@ -26,9 +25,8 @@ function isOrderItem(item: unknown): item is OrderItem {
     return (
         typeof item === 'object' &&
         item !== null &&
-        typeof (item as OrderItem).productId === 'number' &&
+        typeof (item as OrderItem).mealId === 'number' &&
         typeof (item as OrderItem).quantity === 'number' &&
-        typeof (item as OrderItem).price === 'number' &&
         ((item as OrderItem).notes === undefined || typeof (item as OrderItem).notes === 'string')
     );
 }

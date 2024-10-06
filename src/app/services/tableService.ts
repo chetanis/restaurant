@@ -112,3 +112,25 @@ export async function setTableOccupied(id: number,orderNumber:number): Promise<T
         throw error
     }
 }
+
+export async function getCurrentOrderId(id: number) {
+    if (id <= 0) {
+        throw new Error("Invalid table ID")
+    }
+    try {
+        const table = await prisma.table.findUnique({
+            where: { id },
+            include: { currentOrder: true }
+        })
+        if (!table) {
+            throw new Error(`Table with ID ${id} not found`)
+        }
+        if (!table.currentOrder) {
+            throw new Error(`Table with ID ${id} does not have a current order`)
+        }
+        return table.currentOrder.id
+    } catch (error) {
+        console.error("Error fetching current order for table:", error)
+        throw error
+    }
+}

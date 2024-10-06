@@ -26,19 +26,19 @@ enum Role {
 }
 
 model Category {
-  id       Int       @id @default(autoincrement())
-  name     String
-  products Product[]
+  id    Int    @id @default(autoincrement())
+  name  String
+  meals Meal[]
 }
 
-model Product {
+model Meal {
   id          Int         @id @default(autoincrement())
   name        String
   description String?
   price       Float
   categoryId  Int
   category    Category    @relation(fields: [categoryId], references: [id])
-  items       OrderItem[] // Relation to all order items for this product
+  items       OrderItem[] // Relation to all order items for this meal
 }
 
 model Table {
@@ -95,8 +95,8 @@ model OrderUpdate {
 
 model OrderItem {
   id            Int          @id @default(autoincrement())
-  productId     Int
-  product       Product      @relation(fields: [productId], references: [id])
+  mealId        Int
+  meal          Meal         @relation(fields: [mealId], references: [id])
   orderId       Int?
   order         Order?       @relation(fields: [orderId], references: [id])
   orderUpdateId Int?
@@ -105,4 +105,3 @@ model OrderItem {
   notes         String?
   price         Float // Price at the time of ordering
 }
-

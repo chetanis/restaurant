@@ -29,6 +29,6 @@ export async function deleteCategory(id: number) {
 export async function getCategory(id: number) {
     return await prisma.category.findUnique({
         where: { id },
-        include: { products: true }
+        include: { meals: true }
     })
 }

@@ -1,7 +1,7 @@
 import prisma from "@/app/lib/prisma";
 
 export async function createMeal(name: string, price: number, categoryId: number, description?: string) {
-    return await prisma.product.create({
+    return await prisma.meal.create({
         data: {
             name,
             price,
@@ -12,7 +12,7 @@ export async function createMeal(name: string, price: number, categoryId: number
 }
 
 export async function updateMeal(id: number, name: string, price: number, categoryId: number, description?: string) {
-    return await prisma.product.update({
+    return await prisma.meal.update({
         where: { id },
         data: {
             name,
@@ -24,15 +24,15 @@ export async function updateMeal(id: number, name: string, price: number, catego
 }
 
 export async function getMeal(id: number) {
-    const meal = await prisma.product.findUnique({
+    const meal = await prisma.meal.findUnique({
         where: { id }
     });
     // get the number of orders for this meal
     const orders = await prisma.order.findMany({
-        where: { items: { some: { productId: id } } }
+        where: { items: { some: { mealId: id } } }
     });
     const updatedOrders = await prisma.orderUpdate.findMany({
-        where: { items: { some: { productId: id } } }
+        where: { items: { some: { mealId: id } } }
     });
     
     return { meal, orders: orders.length + updatedOrders.length };
