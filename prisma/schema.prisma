@@ -16,7 +16,6 @@ model User {
   password     String
   role         Role
   orders       Order[] // Relation to orders taken by this user
-  orderUpdates OrderUpdate[] // Relation to order updates made by this user
 }
 
 enum Role {
@@ -65,7 +64,6 @@ model Order {
   waiter            User          @relation(fields: [waiterId], references: [id])
   status            OrderStatus
   items             OrderItem[]
-  updates           OrderUpdate[]
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
   printedForKitchen Boolean       @default(false)
@@ -80,27 +78,12 @@ enum OrderStatus {
   CANCELLED
 }
 
-model OrderUpdate {
-  id                Int         @id @default(autoincrement())
-  orderId           Int
-  order             Order       @relation(fields: [orderId], references: [id])
-  waiterId          String // Foreign key to User model
-  waiter            User        @relation(fields: [waiterId], references: [id])
-  items             OrderItem[]
-  createdAt         DateTime    @default(now())
-  status            OrderStatus
-  printedForKitchen Boolean     @default(false)
-  updateAmount      Float       @default(0) // Amount for this specific update
-}
-
 model OrderItem {
   id            Int          @id @default(autoincrement())
   mealId        Int
   meal          Meal         @relation(fields: [mealId], references: [id])
   orderId       Int?
   order         Order?       @relation(fields: [orderId], references: [id])
-  orderUpdateId Int?
-  orderUpdate   OrderUpdate? @relation(fields: [orderUpdateId], references: [id])
   quantity      Int
   notes         String?
   price         Float // Price at the time of ordering

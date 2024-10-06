@@ -17,10 +17,6 @@ async function generatePriceMap(mealIds: number[]): Promise<{ [key: number]: num
 }
 
 export async function createOrder(input: OrderInput) {
-    if (!input.tableId || !input.waiterId || !input.items || input.items.length === 0) {
-        throw new Error("Invalid input for creating an order");
-    }
-
     try {
         // Fetch the prices from the database for each meal in the order
         const mealIds = input.items.map(item => item.mealId);
@@ -62,10 +58,6 @@ export async function createOrder(input: OrderInput) {
 
 
 export async function updateOrder(input: OrderInput, orderId: number) {
-    if (!input.waiterId || !input.items || input.items.length === 0) {
-        throw new Error("Invalid input for updating an order");
-    }
-
     try {
         // Fetch the prices from the database for each meal in the order update
         const mealIds = input.items.map(item => item.mealId);
@@ -78,35 +70,31 @@ export async function updateOrder(input: OrderInput, orderId: number) {
             return total + price * item.quantity;
         }, 0);
 
-        // Create the order update
-        const orderUpdate = await prisma.orderUpdate.create({
-            data: {
-                orderId: orderId,
-                waiterId: input.waiterId,
-                status: 'PENDING',
-                items: {
-                    create: input.items.map(item => ({
-                        mealId: item.mealId,
-                        quantity: item.quantity,
-                        notes: item.notes,
-                        price: priceMap[item.mealId],  // Use the price from the backend
-                    }))
-                },
-                updateAmount: updateAmount  // Use calculated updateAmount
-            },
-            include: { items: true }
-        });
+        // Create the new order items
+        const newOrderItems = await Promise.all(input.items.map(async item => {
+            return await prisma.orderItem.create({
+                data: {
+                    mealId: item.mealId,
+                    quantity: item.quantity,
+                    notes: item.notes,
+                    price: priceMap[item.mealId],  // Use the price from the backend
+                    orderId: orderId  // Associate with the order
+                }
+            });
+        }));
 
         // Update total amount of the main order
         await prisma.order.update({
             where: { id: orderId },
             data: {
-                totalAmount: { increment: updateAmount }  // Increment totalAmount by updateAmount
+                totalAmount: { increment: updateAmount },  // Increment totalAmount by updateAmount
             },
             include: { items: true }
         });
 
-        return orderUpdate;
+        //return the new items ids and the order id
+        return {order: orderId, newItems: newOrderItems.map(item => item.id) };
+        
     } catch (error) {
         console.error("Error updating order:", error);
         throw new Error("Failed to update order");
@@ -114,10 +102,10 @@ export async function updateOrder(input: OrderInput, orderId: number) {
 }
 
 
-export async function printKitchenTicket(orderId: number, updateId?: number) {
+export async function printKitchenTicket(orderId: number, newItems?: number[]) {
     const items = await prisma.orderItem.findMany({
-        where: updateId
-            ? { orderUpdateId: updateId }
+        where: newItems
+            ? { id : { in: newItems } }
             : { orderId: orderId },
         include: { meal: true }
     })
@@ -144,12 +132,12 @@ export async function printKitchenTicket(orderId: number, updateId?: number) {
     // Print ticket (implementation depends on your printing setup)
     await printTicket(ticketContent)
 
-    if (updateId) {
-        await prisma.orderUpdate.update({
-            where: { id: updateId },
-            data: { printedForKitchen: true }
-        })
-    }
+    // if (updateId) {
+    //     await prisma.orderUpdate.update({
+    //         where: { id: updateId },
+    //         data: { printedForKitchen: true }
+    //     })
+    // }
 }
 
 export async function printCustomerBill(orderId: number): Promise<void> {
@@ -158,13 +146,6 @@ export async function printCustomerBill(orderId: number): Promise<void> {
         include: {
             items: {
                 include: { meal: true }
-            },
-            updates: {
-                include: {
-                    items: {
-                        include: { meal: true }
-                    }
-                }
             },
             table: true,
             waiter: true
@@ -175,21 +156,15 @@ export async function printCustomerBill(orderId: number): Promise<void> {
         throw new Error(`Order with id ${orderId} not found`)
     }
 
-    // Combine items from original order and all updates
-    const allItems = [
-        ...order.items,
-        ...order.updates.flatMap(update => update.items)
-    ]
-
     // Group items by meal for a cleaner bill
-    const groupedItems = allItems.reduce((acc, item) => {
+    const groupedItems = order.items.reduce((acc, item) => {
         const key = `${item.mealId}-${item.price}`
         if (!acc[key]) {
             acc[key] = { ...item, quantity: 0 }
         }
         acc[key].quantity += item.quantity
         return acc
-    }, {} as Record<string, typeof allItems[number] & { quantity: number }>)
+    }, {} as Record<string, typeof order.items[number] & { quantity: number }>)
 
     // Calculate total
     const total = Object.values(groupedItems).reduce(

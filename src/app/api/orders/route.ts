@@ -11,20 +11,21 @@ export async function POST(request: NextRequest) {
         if (!isOrderInput(input)) {
             throw new Error('Invalid order input');
         }
-        
-        let order
+
+        let order, newItems;
         // table free = create order
         if (await isTableFree(input.tableId)) {
 
             order = await orderService.createOrder(input);
             setTableOccupied(input.tableId, order.id);
             orderService.printKitchenTicket(order.id);
-            
+
         } else {
             // table not free we create an order update
             const currentOrderId = await getCurrentOrderId(input.tableId);
-            order = await orderService.updateOrder(input, currentOrderId);
-            orderService.printKitchenTicket(order.orderId,order.id);
+            ({ order, newItems } = await orderService.updateOrder(input, currentOrderId)); // Corrected destructuring assignment
+
+            orderService.printKitchenTicket(order, newItems);
         }
 
         return new Response(JSON.stringify(order), { status: 201 });

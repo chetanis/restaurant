@@ -31,11 +31,8 @@ export async function getMeal(id: number) {
     const orders = await prisma.order.findMany({
         where: { items: { some: { mealId: id } } }
     });
-    const updatedOrders = await prisma.orderUpdate.findMany({
-        where: { items: { some: { mealId: id } } }
-    });
     
-    return { meal, orders: orders.length + updatedOrders.length };
+    return { meal, orders: orders.length};
 }
 
 export async function deleteMeal(id: number) {

@@ -1,5 +1,15 @@
-import * as tableService from '@/app/services/tableService'
-import { NextResponse } from 'next/server'
+import * as tableService from '@/app/services/tableService';
+import { NextResponse } from 'next/server';
+
+export async function GET(request: Request, { params }: { params: { id: string } }) {
+    try {
+        const table = await tableService.getTable(Number(params.id))
+        return NextResponse.json(table, { status: 200 })
+    } catch (error) {
+        console.log(error);
+        return NextResponse.json({ error: 'Failed to fetch table' }, { status: 500 })
+    }
+}
 
 export async function PUT(request: Request, { params }: { params: { id: string } }) {
     try {

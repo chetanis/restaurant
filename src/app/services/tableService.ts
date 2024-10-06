@@ -1,5 +1,31 @@
-import prisma from "@/app/lib/prisma"
-import { Table, TableStatus } from "@prisma/client"
+import prisma from "@/app/lib/prisma";
+import { Table, TableStatus } from "@prisma/client";
+
+
+export async function getTable(id: number) {
+    if (id <= 0) {
+        throw new Error("Invalid table ID");
+    }
+    try {
+        return await prisma.table.findUnique({
+            where: { id },
+            include: {
+                currentOrder: {
+                    include: {
+                        items: {
+                            include: {
+                                meal: true // Include meal details for each order item
+                            }
+                        },
+                    }
+                }
+            }
+        });
+    } catch (error) {
+        console.error("Error fetching table:", error);
+        throw error;
+    }
+}
 
 export async function getTables(): Promise<Table[]> {
     try {
