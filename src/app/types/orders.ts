@@ -1,3 +1,5 @@
+import { Prisma } from "@prisma/client";
+
 export interface OrderInput {
     tableId: number;
     items: OrderItem[];
@@ -9,6 +11,12 @@ export interface OrderItem {
     quantity: number;
     notes?: string;
 }
+
+export type OrderWithItems = Prisma.OrderGetPayload<{
+    include: { items: {
+        include: { meal: true}
+    }; table: true; waiter: true }
+  }>;
 
 export function isOrderInput(input: unknown): input is OrderInput {
     return (

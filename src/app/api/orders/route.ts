@@ -20,15 +20,17 @@ export async function POST(request: NextRequest) {
             setTableOccupied(input.tableId, order.id);
             orderService.printKitchenTicket(order.id);
 
-        } else {
-            // table not free we create an order update
-            const currentOrderId = await getCurrentOrderId(input.tableId);
-            ({ order, newItems } = await orderService.updateOrder(input, currentOrderId)); // Corrected destructuring assignment
+            return new Response(JSON.stringify({ message: 'Order created' }), { status: 201 });
 
+        } else {
+            // table not free we update the previous order
+            const currentOrderId = await getCurrentOrderId(input.tableId);
+            ({ order, newItems } = await orderService.updateOrder(input, currentOrderId)); 
             orderService.printKitchenTicket(order, newItems);
+
+            return new Response(JSON.stringify({ message: 'Order updated' }), { status: 200 });
         }
 
-        return new Response(JSON.stringify(order), { status: 201 });
     } catch (error) {
         console.log('Error creating order:', error);
         return new Response(JSON.stringify({ error: 'Failed to create order' }), { status: 400 });

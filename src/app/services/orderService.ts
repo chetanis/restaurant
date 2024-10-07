@@ -1,6 +1,6 @@
 import { printBill, printTicket } from '@/app/lib/printing';
 import prisma from '@/app/lib/prisma';
-import { OrderInput } from '@/app/types/orders';
+import { OrderInput, OrderWithItems } from '@/app/types/orders';
 
 async function generatePriceMap(mealIds: number[]): Promise<{ [key: number]: number }> {
     const meals = await prisma.meal.findMany({
@@ -131,31 +131,24 @@ export async function printKitchenTicket(orderId: number, newItems?: number[]) {
 
     // Print ticket (implementation depends on your printing setup)
     await printTicket(ticketContent)
-
-    // if (updateId) {
-    //     await prisma.orderUpdate.update({
-    //         where: { id: updateId },
-    //         data: { printedForKitchen: true }
-    //     })
-    // }
 }
 
-export async function printCustomerBill(orderId: number): Promise<void> {
-    const order = await prisma.order.findUnique({
+export async function finishOrder(orderId: number): Promise<void> {
+    const newOrder = await prisma.order.update({
         where: { id: orderId },
-        include: {
+        data: { status: 'COMPLETED' },
+        include:{
             items: {
                 include: { meal: true }
             },
             table: true,
             waiter: true
         }
-    })
+    });
+    printCustomerBill(newOrder);
+}
 
-    if (!order) {
-        throw new Error(`Order with id ${orderId} not found`)
-    }
-
+export async function printCustomerBill(order: OrderWithItems): Promise<void> {
     // Group items by meal for a cleaner bill
     const groupedItems = order.items.reduce((acc, item) => {
         const key = `${item.mealId}-${item.price}`
@@ -165,12 +158,6 @@ export async function printCustomerBill(orderId: number): Promise<void> {
         acc[key].quantity += item.quantity
         return acc
     }, {} as Record<string, typeof order.items[number] & { quantity: number }>)
-
-    // Calculate total
-    const total = Object.values(groupedItems).reduce(
-        (sum, item) => sum + item.price * item.quantity,
-        0
-    )
 
     // Generate bill content
     const billContent = `
@@ -188,7 +175,7 @@ export async function printCustomerBill(orderId: number): Promise<void> {
             .join('\n')}
     
     ===============================
-    Total: $${total.toFixed(2)}
+    Total: $${order.totalAmount.toFixed(2)}
     
     Thank you for dining with us!
   `
@@ -196,11 +183,6 @@ export async function printCustomerBill(orderId: number): Promise<void> {
     // Print bill (implementation depends on your printing setup)
     await printBill(billContent)
 
-    // Update order status
-    await prisma.order.update({
-        where: { id: orderId },
-        data: { status: 'COMPLETED' }
-    })
 }
 
 
