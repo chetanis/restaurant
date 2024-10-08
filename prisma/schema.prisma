@@ -8,11 +8,11 @@ datasource db {
 }
 
 model User {
-  id           String        @id @default(uuid())
+  id           String  @id @default(uuid())
   name         String
   last_name    String
   phone_number String
-  username     String        @unique
+  username     String  @unique
   password     String
   role         Role
   orders       Order[] // Relation to orders taken by this user
@@ -37,7 +37,13 @@ model Meal {
   price       Float
   categoryId  Int
   category    Category    @relation(fields: [categoryId], references: [id])
+  status      MealStatus  @default(AVAILABLE)
   items       OrderItem[] // Relation to all order items for this meal
+}
+
+enum MealStatus {
+  AVAILABLE
+  UNAVAILABLE
 }
 
 model Table {
@@ -56,19 +62,19 @@ enum TableStatus {
 }
 
 model Order {
-  id                Int           @id @default(autoincrement())
+  id                Int         @id @default(autoincrement())
   dailyOrderNumber  Int
   tableId           Int
-  table             Table         @relation(fields: [tableId], references: [id])
+  table             Table       @relation(fields: [tableId], references: [id])
   waiterId          String // Foreign key to User model
-  waiter            User          @relation(fields: [waiterId], references: [id])
+  waiter            User        @relation(fields: [waiterId], references: [id])
   status            OrderStatus
   items             OrderItem[]
-  createdAt         DateTime      @default(now())
-  updatedAt         DateTime      @updatedAt
-  printedForKitchen Boolean       @default(false)
-  currentTable      Table?        @relation("CurrentTableOrder")
-  totalAmount       Float         @default(0) // Total amount for the entire order
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  printedForKitchen Boolean     @default(false)
+  currentTable      Table?      @relation("CurrentTableOrder")
+  totalAmount       Float       @default(0) // Total amount for the entire order
 }
 
 enum OrderStatus {
@@ -79,12 +85,12 @@ enum OrderStatus {
 }
 
 model OrderItem {
-  id            Int          @id @default(autoincrement())
-  mealId        Int
-  meal          Meal         @relation(fields: [mealId], references: [id])
-  orderId       Int?
-  order         Order?       @relation(fields: [orderId], references: [id])
-  quantity      Int
-  notes         String?
-  price         Float // Price at the time of ordering
+  id       Int     @id @default(autoincrement())
+  mealId   Int
+  meal     Meal    @relation(fields: [mealId], references: [id])
+  orderId  Int?
+  order    Order?  @relation(fields: [orderId], references: [id])
+  quantity Int
+  notes    String?
+  price    Float // Price at the time of ordering
 }

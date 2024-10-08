@@ -5,11 +5,14 @@ import { OrderInput, OrderWithItems } from '@/app/types/orders';
 async function generatePriceMap(mealIds: number[]): Promise<{ [key: number]: number }> {
     const meals = await prisma.meal.findMany({
         where: { id: { in: mealIds } },
-        select: { id: true, price: true }  // Fetch the current price
+        select: { id: true, price: true, status: true , name: true }  // Fetch the current price
     });
 
-    // Create a price map for quick lookup
+    // Create a price map for quick lookup and validation
     const priceMap = meals.reduce((acc, meal) => {
+        if (meal.status !== 'AVAILABLE') {
+            throw new Error(`${meal.name} is not available`);
+        }
         acc[meal.id] = meal.price;
         return acc;
     }, {} as { [key: number]: number });
@@ -52,7 +55,14 @@ export async function createOrder(input: OrderInput) {
         return newOrder;
     } catch (error) {
         console.error("Error creating order:", error);
-        throw new Error("Failed to create order");
+
+        // Check if error is an instance of Error and has a message property
+        if (error instanceof Error) {
+            throw new Error(error.message || "Failed to create order");
+        } else {
+            // If the error is not an instance of Error, throw a generic message
+            throw new Error("Failed to create order due to an unknown error");
+        }
     }
 }
 
@@ -93,8 +103,8 @@ export async function updateOrder(input: OrderInput, orderId: number) {
         });
 
         //return the new items ids and the order id
-        return {order: orderId, newItems: newOrderItems.map(item => item.id) };
-        
+        return { order: orderId, newItems: newOrderItems.map(item => item.id) };
+
     } catch (error) {
         console.error("Error updating order:", error);
         throw new Error("Failed to update order");
@@ -105,7 +115,7 @@ export async function updateOrder(input: OrderInput, orderId: number) {
 export async function printKitchenTicket(orderId: number, newItems?: number[]) {
     const items = await prisma.orderItem.findMany({
         where: newItems
-            ? { id : { in: newItems } }
+            ? { id: { in: newItems } }
             : { orderId: orderId },
         include: { meal: true }
     })
@@ -137,7 +147,7 @@ export async function finishOrder(orderId: number): Promise<void> {
     const newOrder = await prisma.order.update({
         where: { id: orderId },
         data: { status: 'COMPLETED' },
-        include:{
+        include: {
             items: {
                 include: { meal: true }
             },

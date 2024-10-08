@@ -33,7 +33,14 @@ export async function POST(request: NextRequest) {
 
     } catch (error) {
         console.log('Error creating order:', error);
-        return new Response(JSON.stringify({ error: 'Failed to create order' }), { status: 400 });
+        // Check if error is an instance of Error and has a message property
+        if (error instanceof Error) {
+            return new Response(JSON.stringify({ error: error.message }), { status: 400 });
+        } else {
+            // If the error is not an instance of Error, throw a generic message
+            return new Response(JSON.stringify({ error: 'Failed to create order' }), { status: 400 });
+        }
+        
     }
 }
 
