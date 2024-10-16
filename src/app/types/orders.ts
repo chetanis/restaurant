@@ -4,6 +4,7 @@ export interface OrderInput {
     tableId: number;
     items: OrderItem[];
     waiterId: string;
+    toPrint: boolean;  
 }
 
 export interface OrderItem {
@@ -16,7 +17,7 @@ export type OrderWithItems = Prisma.OrderGetPayload<{
     include: { items: {
         include: { meal: true}
     }; table: true; waiter: true }
-  }>;
+}>;
 
 export function isOrderInput(input: unknown): input is OrderInput {
     return (
@@ -25,6 +26,7 @@ export function isOrderInput(input: unknown): input is OrderInput {
         typeof (input as OrderInput).tableId === 'number' &&
         Array.isArray((input as OrderInput).items) &&
         typeof (input as OrderInput).waiterId === 'string' &&
+        typeof (input as OrderInput).toPrint === 'boolean' &&
         (input as OrderInput).items.every(isOrderItem)
     );
 }

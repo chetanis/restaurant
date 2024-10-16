@@ -25,8 +25,10 @@ export async function POST(request: NextRequest) {
         } else {
             // table not free we update the previous order
             const currentOrderId = await getCurrentOrderId(input.tableId);
-            ({ order, newItems } = await orderService.updateOrder(input, currentOrderId)); 
-            orderService.printKitchenTicket(order, newItems);
+            ({ order, newItems } = await orderService.updateOrder(input, currentOrderId));
+            if (input.toPrint) {
+                orderService.printKitchenTicket(order, newItems);
+            }
 
             return new Response(JSON.stringify({ message: 'Order updated' }), { status: 200 });
         }
@@ -40,7 +42,7 @@ export async function POST(request: NextRequest) {
             // If the error is not an instance of Error, throw a generic message
             return new Response(JSON.stringify({ error: 'Failed to create order' }), { status: 400 });
         }
-        
+
     }
 }
 
