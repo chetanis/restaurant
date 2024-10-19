@@ -25,11 +25,11 @@ export default withAuth(
 
 export const config = {
   matcher: [
-    "/api/categories/:path*",
-    "/api/finishorder/:path*",
-    "/api/orders/:path*",
-    "/api/tables/:path*",
-    "/api/users/:path*",
-    "/api/meals/:path*"
+    // "/api/categories/:path*",
+    // "/api/finishorder/:path*",
+    // "/api/orders/:path*",
+    // "/api/tables/:path*",
+    // "/api/users/:path*",
+    // "/api/meals/:path*"
   ],
 };

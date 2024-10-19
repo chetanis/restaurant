@@ -111,6 +111,40 @@ export async function updateOrder(input: OrderInput, orderId: number) {
     }
 }
 
+export async function finishOrder(orderId: number): Promise<void> {
+    const newOrder = await prisma.order.update({
+        where: { id: orderId },
+        data: { status: 'COMPLETED' },
+        include: {
+            items: {
+                include: { meal: true }
+            },
+            table: true,
+            waiter: true
+        }
+    });
+    printCustomerBill(newOrder);
+}
+
+export async function printCustomerBill(order: OrderWithItems): Promise<void> {
+    // Group items by meal for a cleaner bill
+    const groupedItemsTemp = order.items.reduce((acc, item) => {
+        const key = `${item.mealId}-${item.price}`
+        if (!acc[key]) {
+            acc[key] = { ...item, quantity: 0 }
+        }
+        acc[key].quantity += item.quantity
+        return acc
+    }, {} as Record<string, typeof order.items[number] & { quantity: number }>)
+
+    const groupedItems = Object.values(groupedItemsTemp);
+
+    const date = new Date(order.createdAt).toLocaleDateString();
+    const hour = new Date(order.createdAt).toLocaleTimeString();
+
+    await printBill(order.dailyOrderNumber,order.table.number,date,hour,Object.values(groupedItems),order.totalAmount)
+
+}
 
 export async function printKitchenTicket(orderId: number, newItems?: number[]) {
     const items = await prisma.orderItem.findMany({
@@ -129,70 +163,7 @@ export async function printKitchenTicket(orderId: number, newItems?: number[]) {
         throw new Error(`Order with id ${orderId} not found`)
     }
 
-    // Generate ticket content
-    const ticketContent = `
-        Table: ${order.table.number}
-        Waiter: ${order.waiter.name}
-        Time: ${new Date().toLocaleTimeString()}
-        
-        Items:
-        ${items.map(item => `- ${item.quantity}x ${item.meal.name} ${item.notes ? `(${item.notes})` : ''}`).join('\n\t')}
-      `
-
-    // Print ticket (implementation depends on your printing setup)
-    await printTicket(ticketContent)
-}
-
-export async function finishOrder(orderId: number): Promise<void> {
-    const newOrder = await prisma.order.update({
-        where: { id: orderId },
-        data: { status: 'COMPLETED' },
-        include: {
-            items: {
-                include: { meal: true }
-            },
-            table: true,
-            waiter: true
-        }
-    });
-    printCustomerBill(newOrder);
-}
-
-export async function printCustomerBill(order: OrderWithItems): Promise<void> {
-    // Group items by meal for a cleaner bill
-    const groupedItems = order.items.reduce((acc, item) => {
-        const key = `${item.mealId}-${item.price}`
-        if (!acc[key]) {
-            acc[key] = { ...item, quantity: 0 }
-        }
-        acc[key].quantity += item.quantity
-        return acc
-    }, {} as Record<string, typeof order.items[number] & { quantity: number }>)
-
-    // Generate bill content
-    const billContent = `
-    Restaurant Name
-    ===============================
-    Order #: ${order.dailyOrderNumber}
-    Table: ${order.table.number}
-    Waiter: ${order.waiter.name}
-    Date: ${new Date(order.createdAt).toLocaleDateString()}
-    Time: ${new Date(order.createdAt).toLocaleTimeString()}
-    
-    Items:
-    ${Object.values(groupedItems)
-            .map(item => `${item.quantity.toString().padStart(2)}x ${item.meal.name.padEnd(20)} $${(item.price * item.quantity).toFixed(2)}`)
-            .join('\n')}
-    
-    ===============================
-    Total: $${order.totalAmount.toFixed(2)}
-    
-    Thank you for dining with us!
-  `
-
-    // Print bill (implementation depends on your printing setup)
-    await printBill(billContent)
-
+    await printTicket(order.table.number,order.waiter.name,items);
 }
 
 
